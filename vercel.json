@@ -11,13 +11,5 @@
       "src": "/api/socketio/(.*)",
       "dest": "/api/socketio/$1"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database_url"
-  },
-  "build": {
-    "env": {
-      "DATABASE_URL": "@database_url"
-    }
-  }
+  ]
 }
