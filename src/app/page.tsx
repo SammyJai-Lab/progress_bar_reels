@@ -3,13 +3,13 @@
 import { useState, useRef, useEffect } from 'react'
 
 export default function Home() {
-  const [startValue, setStartValue] = useState(0)
-  const [targetValue, setTargetValue] = useState(100)
+  const [startValue, setStartValue] = useState(0.00)
+  const [targetValue, setTargetValue] = useState(100.00)
   const [isAnimating, setIsAnimating] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [showCountdown, setShowCountdown] = useState(false)
   const [countdown, setCountdown] = useState(3)
-  const [currentProgress, setCurrentProgress] = useState(0)
+  const [currentProgress, setCurrentProgress] = useState(0.00)
   const [showUI, setShowUI] = useState(true)
   
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -18,7 +18,7 @@ export default function Home() {
   const mediaRecorderRef = useRef<MediaRecorder>()
   const chunksRef = useRef<Blob[]>([])
   const audioContextRef = useRef<AudioContext>()
-  const lastPlayedValueRef = useRef<number>(0)
+  const lastPlayedValueRef = useRef<number>(0.00)
 
   // Easing function for smooth animation
   const easeInOutCubic = (t: number): number => {
@@ -55,12 +55,33 @@ export default function Home() {
 
   // Check if number has changed and play sound
   const checkAndPlaySound = (currentValue: number) => {
-    const roundedValue = Number(currentValue.toFixed(2));
+    const roundedValue = Number(currentValue.toFixed(1)); // Trigger every 0.1
     if (roundedValue !== lastPlayedValueRef.current) {
       playClickSound();
       lastPlayedValueRef.current = roundedValue;
     }
   }
+
+  // Initialize clean black background
+  useEffect(() => {
+    const canvas = backgroundCanvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = 1080
+    canvas.height = 1920
+
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [])
 
   // Draw 2D progress bar with white border box
   const drawProgressBar = (progress: number) => {
@@ -103,7 +124,111 @@ export default function Home() {
     ctx.shadowBlur = 0
   }
 
-  // [Other functions like startAnimation, useEffect for cleanup, etc., remain unchanged]
+  // Start animation
+  const startAnimation = (isExport = false) => {
+    if (isAnimating) return
+    
+    initAudio()
+    
+    setIsAnimating(true)
+    setIsRecording(isExport)
+    setShowCountdown(true)
+    setCountdown(3)
+    
+    lastPlayedValueRef.current = Number(startValue.toFixed(1));
+    
+    if (!isExport) {
+      setShowUI(false)
+    }
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === 1) {
+          clearInterval(countdownInterval)
+          setShowCountdown(false)
+          
+          setCurrentProgress(startValue)
+          const startTime = performance.now()
+          const duration = 5000
+          
+          const animate = (currentTime: number) => {
+            const elapsed = currentTime - startTime
+            const rawProgress = Math.min(elapsed / duration, 1)
+            
+            const easedProgress = easeInOutCubic(rawProgress)
+            
+            const currentValue = startValue + (targetValue - startValue) * easedProgress
+            setCurrentProgress(Number(currentValue.toFixed(2)))
+            
+            checkAndPlaySound(currentValue)
+            
+            drawProgressBar(currentValue)
+            
+            if (rawProgress < 1) {
+              animationRef.current = requestAnimationFrame(animate)
+            } else {
+              setIsAnimating(false)
+              setTimeout(() => {
+                setShowUI(true)
+              }, 1000)
+              
+              if (isExport && mediaRecorderRef.current?.state === 'recording') {
+                mediaRecorderRef.current.stop()
+              }
+            }
+          }
+          
+          animationRef.current = requestAnimationFrame(animate)
+          
+          if (isExport) {
+            setShowUI(false)
+            
+            const stream = progressCanvasRef.current!.captureStream(30)
+            chunksRef.current = []
+            
+            mediaRecorderRef.current = new MediaRecorder(stream, {
+              mimeType: 'video/webm;codecs=vp9'
+            })
+            
+            mediaRecorderRef.current.ondataavailable = (e) => {
+              chunksRef.current.push(e.data)
+            }
+            
+            mediaRecorderRef.current.onstop = () => {
+              const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = 'progress-bar.webm'
+              a.click()
+              URL.revokeObjectURL(url)
+              
+              setTimeout(() => {
+                setShowUI(true)
+              }, 1000)
+            }
+            
+            mediaRecorderRef.current.start()
+          }
+          
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+    }
+  }, [])
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden">
@@ -122,7 +247,7 @@ export default function Home() {
       {showUI && (
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
           <div className="bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-6 max-w-md w-full">
-            <h1 className="text-2xl font-bold text-white mb-6 text-center">3D Progress Bar</h1>
+            <h1 className="text-2xl font-bold text-white mb-6 text-center">Progress Bar</h1>
             
             <div className="space-y-4">
               <div>
@@ -131,17 +256,23 @@ export default function Home() {
                 </label>
                 <input
                   type="number"
-                  value={startValue}
+                  value={startValue.toFixed(2)}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setStartValue(value === '' ? 0 : Number(Number(value).toFixed(2)));
+                    const numValue = value === '' ? 0 : Number(Number(value).toFixed(2));
+                    setStartValue(Math.max(0, Math.min(100, numValue)));
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   min="0"
                   max="100"
                   step="0.01"
                   disabled={isAnimating}
+                  aria-label="Start value percentage"
+                  aria-describedby="start-value-desc"
                 />
+                <span id="start-value-desc" className="sr-only">
+                  Enter a percentage between 0 and 100 with up to two decimal places
+                </span>
               </div>
               
               <div>
@@ -150,17 +281,23 @@ export default function Home() {
                 </label>
                 <input
                   type="number"
-                  value={targetValue}
+                  value={targetValue.toFixed(2)}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setTargetValue(value === '' ? 0 : Number(Number(value).toFixed(2)));
+                    const numValue = value === '' ? 0 : Number(Number(value).toFixed(2));
+                    setTargetValue(Math.max(0, Math.min(100, numValue)));
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   min="0"
                   max="100"
                   step="0.01"
                   disabled={isAnimating}
+                  aria-label="Target value percentage"
+                  aria-describedby="target-value-desc"
                 />
+                <span id="target-value-desc" className="sr-only">
+                  Enter a percentage between 0 and 100 with up to two decimal places
+                </span>
               </div>
               
               <div className="flex gap-4">
