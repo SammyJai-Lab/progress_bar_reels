@@ -62,7 +62,7 @@ export default function Home() {
     }
   }
 
-  // NEW: Determine best MIME type and extension
+  // Determine best MIME type and extension
   const getMimeTypeAndExtension = () => {
     const mp4Type = 'video/mp4;codecs=avc1'; // H.264 MP4
     const webmType = 'video/webm;codecs=vp8'; // VP8 WebM for fallback (broader than VP9)
@@ -126,16 +126,12 @@ export default function Home() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(barX, barY, fillWidth, barHeight)
 
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.8)'
-    ctx.shadowBlur = 15
+    // MODIFIED: Removed glow effect (shadowColor and shadowBlur)
     ctx.fillStyle = '#ffffff'
     ctx.font = 'bold 48px Arial'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(`${progress.toFixed(2)}%`, canvas.width / 2, barY + barHeight + 60)
-    
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
   }
 
   // Start animation
@@ -200,7 +196,6 @@ export default function Home() {
             const stream = progressCanvasRef.current!.captureStream(30)
             chunksRef.current = []
             
-            // MODIFIED: Use dynamic MIME type
             const { mimeType, extension } = getMimeTypeAndExtension();
             
             mediaRecorderRef.current = new MediaRecorder(stream, {
@@ -216,7 +211,7 @@ export default function Home() {
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
-              a.download = `progress-bar.${extension}` // MODIFIED: Dynamic extension
+              a.download = `progress-bar.${extension}`
               a.click()
               URL.revokeObjectURL(url)
               
