@@ -62,6 +62,20 @@ export default function Home() {
     }
   }
 
+  // NEW: Determine best MIME type and extension
+  const getMimeTypeAndExtension = () => {
+    const mp4Type = 'video/mp4;codecs=avc1'; // H.264 MP4
+    const webmType = 'video/webm;codecs=vp8'; // VP8 WebM for fallback (broader than VP9)
+    
+    if (MediaRecorder.isTypeSupported(mp4Type)) {
+      console.log('MP4 supported, using video/mp4;codecs=avc1');
+      return { mimeType: mp4Type, extension: 'mp4' };
+    } else {
+      console.warn('MP4 not supported, falling back to WebM');
+      return { mimeType: webmType, extension: 'webm' };
+    }
+  }
+
   // Initialize clean black background
   useEffect(() => {
     const canvas = backgroundCanvasRef.current
@@ -186,8 +200,11 @@ export default function Home() {
             const stream = progressCanvasRef.current!.captureStream(30)
             chunksRef.current = []
             
+            // MODIFIED: Use dynamic MIME type
+            const { mimeType, extension } = getMimeTypeAndExtension();
+            
             mediaRecorderRef.current = new MediaRecorder(stream, {
-              mimeType: 'video/webm;codecs=vp9'
+              mimeType: mimeType
             })
             
             mediaRecorderRef.current.ondataavailable = (e) => {
@@ -195,11 +212,11 @@ export default function Home() {
             }
             
             mediaRecorderRef.current.onstop = () => {
-              const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+              const blob = new Blob(chunksRef.current, { type: mimeType })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
-              a.download = 'progress-bar.webm'
+              a.download = `progress-bar.${extension}` // MODIFIED: Dynamic extension
               a.click()
               URL.revokeObjectURL(url)
               
