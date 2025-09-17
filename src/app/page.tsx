@@ -291,6 +291,7 @@ export default function Home() {
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white"
                   min="0"
                   max="100"
+                  step="0.01"
                   disabled={isAnimating}
                 />
               </div>
